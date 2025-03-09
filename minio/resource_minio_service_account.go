@@ -51,13 +51,14 @@ func resourceMinioServiceAccount() *schema.Resource {
 			"secret_key": {
 				Type:        schema.TypeString,
 				Description: "secret key of service account",
-				Computed:    true,
+				Required:    true,
 				Sensitive:   true,
 			},
 			"access_key": {
 				Type:        schema.TypeString,
 				Description: "access key of service account",
-				Computed:    true,
+				Required:    true,
+				Sensitive:   true,
 			},
 			"policy": {
 				Type:             schema.TypeString,
@@ -98,15 +99,19 @@ func minioCreateServiceAccount(ctx context.Context, d *schema.ResourceData, meta
 
 	var err error
 	targetUser := serviceAccountConfig.MinioTargetUser
+	secretKey := serviceAccountConfig.MinioSecretKey
+	accessKey := serviceAccountConfig.MinioAccessKey
 	policy := serviceAccountConfig.MinioSAPolicy
 	expiration, err := time.Parse(time.RFC3339, serviceAccountConfig.MinioExpiration)
 	if err != nil {
 		return NewResourceError("Failed to parse expiration", serviceAccountConfig.MinioExpiration, err)
 	}
 
-	serviceAccount, err := serviceAccountConfig.MinioAdmin.AddServiceAccount(ctx, madmin.AddServiceAccountReq{
+	_, err = serviceAccountConfig.MinioAdmin.AddServiceAccount(ctx, madmin.AddServiceAccountReq{
 		Policy:      processServiceAccountPolicy(policy),
 		TargetUser:  targetUser,
+		SecretKey:   secretKey,
+		AccessKey:   accessKey,
 		Name:        serviceAccountConfig.MinioName,
 		Description: serviceAccountConfig.MinioDescription,
 		Expiration:  &expiration,
@@ -114,8 +119,6 @@ func minioCreateServiceAccount(ctx context.Context, d *schema.ResourceData, meta
 	if err != nil {
 		return NewResourceError("error creating service account", targetUser, err)
 	}
-	accessKey := serviceAccount.AccessKey
-	secretKey := serviceAccount.SecretKey
 
 	d.SetId(aws.StringValue(&accessKey))
 	_ = d.Set("access_key", accessKey)
